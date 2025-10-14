@@ -82,7 +82,59 @@ app.get("/create", protect, async (req, res) => {
 });
 
 io.on("connection", (socket) => {
-  console.log("User connected");
+  console.log("🟢 New socket connected:", socket.id);
+
+  socket.on("join_room", async ({ code, userId }) => {
+    try {
+      const room = await prisma.room.findUnique({ where: { code } });
+
+      if (!room) {
+        return socket.emit("error", { message: "Room not found" });
+      }
+
+      if (room.player1Id === userId) {
+        // join socket.io room but DO NOT write to DB
+        socket.join(code);
+        socket.emit("waiting", { message: "Waiting for opponent to join" });
+        console.log(`Host ${userId} re-joined socket room ${code}`);
+        return;
+      }
+
+      if (room.player2Id) {
+        return socket.emit("roomFull", {
+          message: "Room already has 2 players",
+        });
+      }
+
+      const result = await prisma.room.updateMany({
+        where: { code, player2Id: null },
+        data: { player2Id: userId },
+      });
+
+      if (result.count === 0) {
+        socket.emit("roomFull", { message: "Room is already full" });
+        console.log(
+          `Join failed — player2 slot already taken for room ${code}`,
+        );
+        return;
+      }
+
+      socket.join(code);
+
+      const updatedRoom = await prisma.room.findUnique({ where: { code } });
+
+      io.to(code).emit("roomReady", {
+        message: "Both players connected — game can start",
+        room: updatedRoom,
+      });
+
+      console.log(`✅ Player ${userId} joined room ${code}`);
+    } catch (error) {
+      console.error("Join room error:", error);
+      socket.emit("error", { message: "Error joining room" });
+    }
+  });
+
   socket.on("disconnect", () => {
     console.log("🔴 Client disconnected:", socket.id);
   });
