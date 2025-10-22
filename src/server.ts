@@ -1,19 +1,50 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import { Prisma } from "@prisma/client";
 import prisma from "./prisma.js";
 import { createJWT, protect } from "./middleware.js";
 import http from "http";
 import { Server } from "socket.io";
+import axios from "axios";
 
 dotenv.config();
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, {
+  cors: {
+    origin: "http://localhost:5173", // Your frontend URL
+    methods: ["GET", "POST"]
+  }
+});
 
 app.use(cors());
 app.use(express.json());
+
+interface Questions{
+  question:string,
+  correctAnswer:string,
+  incorrectAnswers: string[];
+}
+
+const fetchQuestions=async()=>{
+  const response=await axios.get("https://opentdb.com/api.php?amount=10&category=21&difficulty=easy&type=multiple");
+  const data=response.data.results;
+  const questions: Questions[] = data.map((question: any) => ({
+    question: question.question,
+    correctAnswer: question.correct_answer,
+    incorrectAnswers: question.incorrect_answers,
+  }));
+  return questions;
+}
+
+interface GameState {
+  questions: Questions[];
+  currentQuestion: number;
+  player1Score: number;
+  player2Score: number;
+}
 
 app.get("/", async (req, res) => {
   res.send("Hoop Backend running 🏀");
@@ -93,7 +124,6 @@ io.on("connection", (socket) => {
       }
 
       if (room.player1Id === userId) {
-        // join socket.io room but DO NOT write to DB
         socket.join(code);
         socket.emit("waiting", { message: "Waiting for opponent to join" });
         console.log(`Host ${userId} re-joined socket room ${code}`);
@@ -134,6 +164,7 @@ io.on("connection", (socket) => {
       socket.emit("error", { message: "Error joining room" });
     }
   });
+
 
   socket.on("disconnect", () => {
     console.log("🔴 Client disconnected:", socket.id);
