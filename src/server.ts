@@ -267,8 +267,12 @@ io.on("connection", (socket) => {
       });
     }
 
-    const dbPlayer1score = await prisma.user.findUnique({ where: { id: room.player1Id as string, highestScore: game.player1Score } })
-    const dbPlayer2score = await prisma.user.findUnique({ where: { id: room.player2Id as string, highestScore: game.player2Score } })
+    const dbPlayer1score = await prisma.user.findUnique({
+      where: { id: room.player1Id as string },
+    });
+    const dbPlayer2score = await prisma.user.findUnique({
+      where: { id: room.player2Id as string },
+    });
 
     if (!dbPlayer1score) {
       await prisma.user.update({
@@ -313,16 +317,16 @@ io.on("connection", (socket) => {
       data: { status: RoomStatus.FINISHED },
     });
 
-    console.log(`🏁 Game finished in room ${code}. ${winner}`);
+    console.log(`Game finished in room ${code}. ${winner}`);
 
   })
 
   socket.on("disconnect", () => {
-    console.log("🔴 Client disconnected:", socket.id);
+    console.log("Client disconnected:", socket.id);
   });
 });
 
 const PORT = process.env.PORT || 4000;
 server.listen(PORT, () => {
-  console.log(`✅ Server running at http://localhost:${PORT}`);
+  console.log(`Server running at http://localhost:${PORT}`);
 });
