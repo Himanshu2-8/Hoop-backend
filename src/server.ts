@@ -16,21 +16,23 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
     origin: "http://localhost:5173", // Your frontend URL
-    methods: ["GET", "POST"]
-  }
+    methods: ["GET", "POST"],
+  },
 });
 
 app.use(cors());
 app.use(express.json());
 
 interface Questions {
-  question: string,
-  correctAnswer: string,
+  question: string;
+  correctAnswer: string;
   incorrectAnswers: string[];
 }
 
 const fetchQuestions = async () => {
-  const response = await axios.get("https://opentdb.com/api.php?amount=10&category=21&difficulty=easy&type=multiple");
+  const response = await axios.get(
+    "https://opentdb.com/api.php?amount=10&category=21&difficulty=easy&type=multiple",
+  );
   const data = response.data.results;
   const questions: Questions[] = data.map((question: any) => ({
     question: question.question,
@@ -38,7 +40,7 @@ const fetchQuestions = async () => {
     incorrectAnswers: question.incorrect_answers,
   }));
   return questions;
-}
+};
 
 interface GameState {
   questions: Questions[];
@@ -188,38 +190,38 @@ io.on("connection", (socket) => {
       player2Score: 0,
       player1Answered: false,
       player2Answered: false,
-    })
+    });
 
     const updatedRoom = await prisma.room.update({
       where: { code },
       data: { status: RoomStatus.STARTED },
-    })
+    });
     io.to(code).emit("game_started", {
       question: questions[0],
       questionNumber: 1,
       player1Score: 0,
       player2Score: 0,
     });
-  })
+  });
+
   socket.on("submit_answer", async ({ code, answer, userId }) => {
     const room = await prisma.room.findUnique({ where: { code } });
-    if (!room) {
-      return socket.emit("error", { message: "Room not found" });
-    }
-    if (room.status == RoomStatus.WAITING) {
+    if (!room) return socket.emit("error", { message: "Room not found" });
+
+    if (room.status === RoomStatus.WAITING) {
       return socket.emit("error", { message: "Game not started" });
     }
+
     const game = gameStates.get(code);
-    if (!game) {
-      return socket.to(code).emit("error", { message: "Game not found" });
-    }
+    if (!game) return socket.emit("error", { message: "Game not found" });
+
     const currentQ = game.questions[game.currentQuestion];
-    if (!currentQ) {
+    if (!currentQ)
       return socket.emit("error", { message: "Question not found" });
-    }
 
     const isCorrect = answer === currentQ.correctAnswer;
 
+    // Mark player as answered and update score
     if (room.player1Id === userId) {
       if (game.player1Answered) {
         return socket.emit("error", { message: "Already answered" });
@@ -233,93 +235,84 @@ io.on("connection", (socket) => {
       game.player2Answered = true;
       if (isCorrect) game.player2Score++;
     }
+
+    // Send feedback to the player who just answered
     socket.emit("answered", {
       isCorrect,
-      answer: currentQ.correctAnswer,
-    })
+      correctAnswer: currentQ.correctAnswer,
+    });
 
+    // ✅ ONLY proceed when BOTH players have answered
     if (game.player1Answered && game.player2Answered) {
-      io.to(code).emit("scores_updates", {
+      // Send score update
+      io.to(code).emit("scores_updated", {
         player1Score: game.player1Score,
         player2Score: game.player2Score,
-      })
-    }
+      });
 
-    game.currentQuestion++;
-    game.player1Answered = false;
-    game.player2Answered = false;
+      // Move to next question
+      game.currentQuestion++;
+      game.player1Answered = false;
+      game.player2Answered = false;
 
-    if (game.currentQuestion < game.questions.length) {
-      setTimeout(() => {
-        io.to(code).emit("next_question", {
-          question: game.questions[game.currentQuestion],
-          questionNumber: game.currentQuestion + 1,
-          totalQuestions: game.questions.length,
+      if (game.currentQuestion < game.questions.length) {
+        setTimeout(() => {
+          io.to(code).emit("next_question", {
+            question: game.questions[game.currentQuestion],
+            questionNumber: game.currentQuestion + 1,
+            totalQuestions: game.questions.length,
+          });
+        }, 2000);
+      } else {
+        // Game Over
+        let winner: string;
+        if (game.player1Score > game.player2Score) {
+          winner = room.player1Id as string;
+        } else if (game.player2Score > game.player1Score) {
+          winner = room.player2Id as string;
+        } else {
+          winner = "tie";
+        }
+
+        // Update high scores
+        const player1 = await prisma.user.findUnique({
+          where: { id: room.player1Id as string },
         });
-      }, 2000);
-    } else {
-      let winner: string = game.player1Score > game.player2Score ? room.player1Id as string : room.player2Id as string
-      if (game.player1Score == game.player2Score) winner = "tie";
-      io.to(code).emit("game_over", {
-        player1Score: game.player1Score,
-        player2Score: game.player2Score,
-        winner,
-      });
+        const player2 = await prisma.user.findUnique({
+          where: { id: room.player2Id as string },
+        });
+
+        if (player1 && game.player1Score > player1.highestScore) {
+          await prisma.user.update({
+            where: { id: room.player1Id as string },
+            data: { highestScore: game.player1Score },
+          });
+        }
+
+        if (player2 && game.player2Score > player2.highestScore) {
+          await prisma.user.update({
+            where: { id: room.player2Id as string },
+            data: { highestScore: game.player2Score },
+          });
+        }
+
+        io.to(code).emit("game_over", {
+          player1Score: game.player1Score,
+          player2Score: game.player2Score,
+          winner,
+        });
+
+        // Cleanup
+        gameStates.delete(code);
+        await prisma.room.update({
+          where: { code },
+          data: { status: RoomStatus.FINISHED },
+        });
+
+        console.log(`Game finished in room ${code}. Winner: ${winner}`);
+      }
     }
-
-    const dbPlayer1score = await prisma.user.findUnique({
-      where: { id: room.player1Id as string },
-    });
-    const dbPlayer2score = await prisma.user.findUnique({
-      where: { id: room.player2Id as string },
-    });
-
-    if (!dbPlayer1score) {
-      await prisma.user.update({
-        where: { id: room.player1Id as string },
-        data: { highestScore: game.player1Score },
-      })
-    }
-
-    if (dbPlayer1score && game.player1Score > dbPlayer1score.highestScore) {
-      await prisma.user.update({
-        where: { id: room.player1Id as string },
-        data: { highestScore: game.player1Score },
-      });
-    }
-
-    if (!dbPlayer2score) {
-      await prisma.user.update({
-        where: { id: room.player2Id as string },
-        data: { highestScore: game.player2Score },
-      })
-    }
-
-    if (dbPlayer2score && game.player2Score > dbPlayer2score.highestScore) {
-      await prisma.user.update({
-        where: { id: room.player2Id as string },
-        data: { highestScore: game.player2Score },
-      });
-    }
-
-    let winner = '';
-    if (game.player1Score > game.player2Score) {
-      winner = 'Player 1';
-    } else if (game.player2Score > game.player1Score) {
-      winner = 'Player 2';
-    } else {
-      winner = 'It\'s a tie!';
-    }
-
-    gameStates.delete(code);
-    await prisma.room.update({
-      where: { code },
-      data: { status: RoomStatus.FINISHED },
-    });
-
-    console.log(`Game finished in room ${code}. ${winner}`);
-
-  })
+  });
 
   socket.on("disconnect", () => {
     console.log("Client disconnected:", socket.id);
