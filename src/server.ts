@@ -1,21 +1,19 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import { Prisma } from "@prisma/client";
-import prisma from "./prisma.js";
-import { createJWT, protect } from "./middleware.js";
+import prisma from "./prisma";
+import { createJWT, protect } from "./middleware";
 import http from "http";
 import { Server } from "socket.io";
 import axios from "axios";
-import { RoomStatus } from "./generated/prisma/index.js";
-
+import { RoomStatus } from "./generated/prisma";
 dotenv.config();
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:5173", // Your frontend URL
+    origin: "http://localhost:5173",
     methods: ["GET", "POST"],
   },
 });
@@ -160,7 +158,7 @@ io.on("connection", (socket) => {
 
       const updatedRoom = await prisma.room.findUnique({ where: { code } });
 
-      io.to(code).emit("roomReady", {
+      io.to(code).emit("room_ready", {
         message: "Both players connected — game can start",
         room: updatedRoom,
       });
@@ -221,7 +219,6 @@ io.on("connection", (socket) => {
 
     const isCorrect = answer === currentQ.correctAnswer;
 
-    // Mark player as answered and update score
     if (room.player1Id === userId) {
       if (game.player1Answered) {
         return socket.emit("error", { message: "Already answered" });
@@ -236,21 +233,17 @@ io.on("connection", (socket) => {
       if (isCorrect) game.player2Score++;
     }
 
-    // Send feedback to the player who just answered
     socket.emit("answered", {
       isCorrect,
       correctAnswer: currentQ.correctAnswer,
     });
 
-    // ✅ ONLY proceed when BOTH players have answered
     if (game.player1Answered && game.player2Answered) {
-      // Send score update
       io.to(code).emit("scores_updated", {
         player1Score: game.player1Score,
         player2Score: game.player2Score,
       });
 
-      // Move to next question
       game.currentQuestion++;
       game.player1Answered = false;
       game.player2Answered = false;
@@ -264,7 +257,6 @@ io.on("connection", (socket) => {
           });
         }, 2000);
       } else {
-        // Game Over
         let winner: string;
         if (game.player1Score > game.player2Score) {
           winner = room.player1Id as string;
@@ -274,7 +266,6 @@ io.on("connection", (socket) => {
           winner = "tie";
         }
 
-        // Update high scores
         const player1 = await prisma.user.findUnique({
           where: { id: room.player1Id as string },
         });
@@ -302,7 +293,6 @@ io.on("connection", (socket) => {
           winner,
         });
 
-        // Cleanup
         gameStates.delete(code);
         await prisma.room.update({
           where: { code },
