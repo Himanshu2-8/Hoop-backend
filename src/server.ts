@@ -15,6 +15,7 @@ const io = new Server(server, {
   cors: {
     origin: "http://localhost:5173",
     methods: ["GET", "POST"],
+    credentials: true,
   },
 });
 
@@ -114,7 +115,7 @@ app.get("/create", protect, async (req, res) => {
       player1Id: req.user.id,
     },
   });
-  res.json({ code });
+  res.json({ code: stringCode });
 });
 
 io.on("connection", (socket) => {
@@ -154,11 +155,18 @@ io.on("connection", (socket) => {
         return;
       }
 
-      socket.join(code);
-
       const updatedRoom = await prisma.room.findUnique({ where: { code } });
 
-      io.to(code).emit("room_ready", {
+      // Emit to the joining player first
+      socket.emit("room_ready", {
+        message: "Both players connected — game can start",
+        room: updatedRoom,
+      });
+
+      socket.join(code);
+
+      // Then emit to the rest of the room (the host)
+      socket.to(code).emit("room_ready", {
         message: "Both players connected — game can start",
         room: updatedRoom,
       });
@@ -309,7 +317,7 @@ io.on("connection", (socket) => {
   });
 });
 
-const PORT = process.env.PORT || 4000;
+const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}`);
 });
