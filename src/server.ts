@@ -6,9 +6,9 @@ import { createJWT, protect } from "./middleware";
 import http from "http";
 import { Server } from "socket.io";
 import axios from "axios";
-import { RoomStatus } from "./generated/prisma";
+import { RoomStatus } from "@prisma/client";
 import helmet from "helmet";
-import { logger } from "./logger";
+import logger from "./logger";
 
 dotenv.config();
 
@@ -87,7 +87,7 @@ app.post("/signup", async (req, res) => {
     return res
       .status(201)
       .json({ message: "User created successfully", token });
-  } catch (e) {
+  } catch (e: any) {
     logger.error(e, "Error creating user");
     return res.status(500).json({ message: "Internal server error" });
   }
@@ -182,7 +182,7 @@ io.on("connection", (socket) => {
       });
 
       logger.info(`✅ Player ${userId} joined room ${code}`);
-    } catch (error) {
+    } catch (error: any) {
       logger.error(error, "Join room error");
       socket.emit("error", { message: "Error joining room" });
     }

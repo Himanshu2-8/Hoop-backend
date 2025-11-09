@@ -11,13 +11,13 @@ const middleware_1 = require("./middleware");
 const http_1 = __importDefault(require("http"));
 const socket_io_1 = require("socket.io");
 const axios_1 = __importDefault(require("axios"));
-const prisma_2 = require("./generated/prisma");
+const client_1 = require("@prisma/client");
 const helmet_1 = __importDefault(require("helmet"));
-const logger_1 = require("./logger");
+const logger_1 = __importDefault(require("./logger"));
 dotenv_1.default.config();
 const { PORT, CORS_ORIGIN, SPORTS_API, JWT_SECRET } = process.env;
 if (!PORT || !CORS_ORIGIN || !SPORTS_API || !JWT_SECRET) {
-    logger_1.logger.error("Missing required environment variables");
+    logger_1.default.error("Missing required environment variables");
     process.exit(1);
 }
 const app = (0, express_1.default)();
@@ -68,7 +68,7 @@ app.post("/signup", async (req, res) => {
             .json({ message: "User created successfully", token });
     }
     catch (e) {
-        logger_1.logger.error(e, "Error creating user");
+        logger_1.default.error(e, "Error creating user");
         return res.status(500).json({ message: "Internal server error" });
     }
 });
@@ -103,7 +103,7 @@ app.get("/create", middleware_1.protect, async (req, res) => {
     res.json({ code: stringCode });
 });
 io.on("connection", (socket) => {
-    logger_1.logger.info(`🟢 New socket connected: ${socket.id}`);
+    logger_1.default.info(`🟢 New socket connected: ${socket.id}`);
     socket.on("join_room", async ({ code, userId }) => {
         try {
             const room = await prisma_1.default.room.findUnique({ where: { code } });
@@ -113,7 +113,7 @@ io.on("connection", (socket) => {
             if (room.player1Id === userId) {
                 socket.join(code);
                 socket.emit("waiting", { message: "Waiting for opponent to join" });
-                logger_1.logger.info(`Host ${userId} re-joined socket room ${code}`);
+                logger_1.default.info(`Host ${userId} re-joined socket room ${code}`);
                 return;
             }
             if (room.player2Id) {
@@ -127,7 +127,7 @@ io.on("connection", (socket) => {
             });
             if (result.count === 0) {
                 socket.emit("roomFull", { message: "Room is already full" });
-                logger_1.logger.warn(`Join failed — player2 slot already taken for room ${code}`);
+                logger_1.default.warn(`Join failed — player2 slot already taken for room ${code}`);
                 return;
             }
             const updatedRoom = await prisma_1.default.room.findUnique({ where: { code } });
@@ -142,10 +142,10 @@ io.on("connection", (socket) => {
                 message: "Both players connected — game can start",
                 room: updatedRoom,
             });
-            logger_1.logger.info(`✅ Player ${userId} joined room ${code}`);
+            logger_1.default.info(`✅ Player ${userId} joined room ${code}`);
         }
         catch (error) {
-            logger_1.logger.error(error, "Join room error");
+            logger_1.default.error(error, "Join room error");
             socket.emit("error", { message: "Error joining room" });
         }
     });
@@ -154,7 +154,7 @@ io.on("connection", (socket) => {
         if (!room) {
             return socket.emit("error", { message: "Room not found" });
         }
-        if (room.status == prisma_2.RoomStatus.STARTED) {
+        if (room.status == client_1.RoomStatus.STARTED) {
             return socket.emit("error", { message: "Game already started" });
         }
         const questions = await fetchQuestions();
@@ -168,7 +168,7 @@ io.on("connection", (socket) => {
         });
         const updatedRoom = await prisma_1.default.room.update({
             where: { code },
-            data: { status: prisma_2.RoomStatus.STARTED },
+            data: { status: client_1.RoomStatus.STARTED },
         });
         io.to(code).emit("game_started", {
             question: questions[0],
@@ -181,7 +181,7 @@ io.on("connection", (socket) => {
         const room = await prisma_1.default.room.findUnique({ where: { code } });
         if (!room)
             return socket.emit("error", { message: "Room not found" });
-        if (room.status === prisma_2.RoomStatus.WAITING) {
+        if (room.status === client_1.RoomStatus.WAITING) {
             return socket.emit("error", { message: "Game not started" });
         }
         const game = gameStates.get(code);
@@ -265,17 +265,17 @@ io.on("connection", (socket) => {
                 gameStates.delete(code);
                 await prisma_1.default.room.update({
                     where: { code },
-                    data: { status: prisma_2.RoomStatus.FINISHED },
+                    data: { status: client_1.RoomStatus.FINISHED },
                 });
-                logger_1.logger.info(`Game finished in room ${code}. Winner: ${winner}`);
+                logger_1.default.info(`Game finished in room ${code}. Winner: ${winner}`);
             }
         }
     });
     socket.on("disconnect", () => {
-        logger_1.logger.info(`Client disconnected: ${socket.id}`);
+        logger_1.default.info(`Client disconnected: ${socket.id}`);
     });
 });
 server.listen(PORT, () => {
-    logger_1.logger.info(`Server running at http://localhost:${PORT}`);
+    logger_1.default.info(`Server running at http://localhost:${PORT}`);
 });
 //# sourceMappingURL=server.js.map

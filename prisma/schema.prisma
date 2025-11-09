@@ -6,14 +6,12 @@
 
 generator client {
   provider = "prisma-client-js"
-  output   = "../src/generated/prisma"
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
-
 
 model User {
   id           String   @id @default(cuid())
@@ -25,12 +23,12 @@ model User {
 }
 
 model Room {
-  id         String   @id @default(cuid())
-  code       String   @unique
-  player1Id  String?
-  player2Id  String?
-  createdAt  DateTime @default(now())
-  status     RoomStatus @default(WAITING)
+  id        String     @id @default(cuid())
+  code      String     @unique
+  player1Id String?
+  player2Id String?
+  createdAt DateTime   @default(now())
+  status    RoomStatus @default(WAITING)
 }
 
 enum RoomStatus {
