@@ -7,19 +7,30 @@ import http from "http";
 import { Server } from "socket.io";
 import axios from "axios";
 import { RoomStatus } from "./generated/prisma";
+import helmet from "helmet";
+import { logger } from "./logger";
+
 dotenv.config();
+
+const { PORT, CORS_ORIGIN, SPORTS_API, JWT_SECRET } = process.env;
+
+if (!PORT || !CORS_ORIGIN || !SPORTS_API || !JWT_SECRET) {
+  logger.error("Missing required environment variables");
+  process.exit(1);
+}
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:5173",
+    origin: CORS_ORIGIN,
     methods: ["GET", "POST"],
     credentials: true,
   },
 });
 
-app.use(cors());
+app.use(helmet());
+app.use(cors({ origin: CORS_ORIGIN }));
 app.use(express.json());
 
 interface Questions {
@@ -29,9 +40,7 @@ interface Questions {
 }
 
 const fetchQuestions = async () => {
-  const response = await axios.get(
-    "https://opentdb.com/api.php?amount=10&category=21&difficulty=easy&type=multiple",
-  );
+  const response = await axios.get(SPORTS_API as string);
   const data = response.data.results;
   const questions: Questions[] = data.map((question: any) => ({
     question: question.question,
@@ -79,6 +88,7 @@ app.post("/signup", async (req, res) => {
       .status(201)
       .json({ message: "User created successfully", token });
   } catch (e) {
+    logger.error(e, "Error creating user");
     return res.status(500).json({ message: "Internal server error" });
   }
 });
@@ -119,7 +129,7 @@ app.get("/create", protect, async (req, res) => {
 });
 
 io.on("connection", (socket) => {
-  console.log("🟢 New socket connected:", socket.id);
+  logger.info(`🟢 New socket connected: ${socket.id}`);
 
   socket.on("join_room", async ({ code, userId }) => {
     try {
@@ -132,7 +142,7 @@ io.on("connection", (socket) => {
       if (room.player1Id === userId) {
         socket.join(code);
         socket.emit("waiting", { message: "Waiting for opponent to join" });
-        console.log(`Host ${userId} re-joined socket room ${code}`);
+        logger.info(`Host ${userId} re-joined socket room ${code}`);
         return;
       }
 
@@ -149,7 +159,7 @@ io.on("connection", (socket) => {
 
       if (result.count === 0) {
         socket.emit("roomFull", { message: "Room is already full" });
-        console.log(
+        logger.warn(
           `Join failed — player2 slot already taken for room ${code}`,
         );
         return;
@@ -171,9 +181,9 @@ io.on("connection", (socket) => {
         room: updatedRoom,
       });
 
-      console.log(`✅ Player ${userId} joined room ${code}`);
+      logger.info(`✅ Player ${userId} joined room ${code}`);
     } catch (error) {
-      console.error("Join room error:", error);
+      logger.error(error, "Join room error");
       socket.emit("error", { message: "Error joining room" });
     }
   });
@@ -307,17 +317,16 @@ io.on("connection", (socket) => {
           data: { status: RoomStatus.FINISHED },
         });
 
-        console.log(`Game finished in room ${code}. Winner: ${winner}`);
+        logger.info(`Game finished in room ${code}. Winner: ${winner}`);
       }
     }
   });
 
   socket.on("disconnect", () => {
-    console.log("Client disconnected:", socket.id);
+    logger.info(`Client disconnected: ${socket.id}`);
   });
 });
 
-const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
+  logger.info(`Server running at http://localhost:${PORT}`);
 });
