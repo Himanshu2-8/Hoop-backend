@@ -1,34 +1,40 @@
 {
   "compilerOptions": {
-    // File Layout
+    // ==== File Layout ====
     "rootDir": "./src",
     "outDir": "./dist",
 
-    // Environment Settings
-    "module": "CommonJS",
+    // ==== Environment Settings ====
     "target": "ES2020",
+    "module": "CommonJS",
     "moduleResolution": "node",
-
     "lib": ["ESNext"],
     "types": ["node"],
 
-    // Other Outputs
-    "sourceMap": true,
-    "declaration": true,
-    "declarationMap": true,
+    // ==== Output Control ====
+    "sourceMap": true, // Helpful for debugging
+    "declaration": false, // You can disable to reduce build clutter
+    "declarationMap": false, // Not needed unless publishing as a library
+    "removeComments": true, // Optional: smaller dist files
 
-    // Stricter Typechecking Options
+    // ==== Strict Type Checking ====
+    "strict": true,
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
 
-    // Recommended Options
-    "strict": true,
-    //"verbatimModuleSyntax": true,
-    "isolatedModules": true,
-    "noUncheckedSideEffectImports": true,
-    "moduleDetection": "force",
+    // ==== Module Interop ====
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+
+    // ==== Performance & Compatibility ====
     "skipLibCheck": true,
-    "esModuleInterop": true
+    "isolatedModules": true,
+
+    // ==== Optional: Useful for cleaner imports ====
+    "resolveJsonModule": true, // allows importing .json if needed
+    "moduleDetection": "force"
   },
-  "include": ["src"]
+
+  "include": ["src"],
+  "exclude": ["node_modules", "dist", "logs"]
 }

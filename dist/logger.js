@@ -4,8 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const winston_1 = __importDefault(require("winston"));
-const logFormat = winston_1.default.format.combine(winston_1.default.format.colorize(), // Adds colors for readability
-winston_1.default.format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }), winston_1.default.format.printf(({ timestamp, level, message, stack }) => `[${timestamp}] ${level}: ${stack || message}`));
+const logFormat = winston_1.default.format.combine(winston_1.default.format.colorize(), winston_1.default.format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }), winston_1.default.format.printf(({ timestamp, level, message, stack }) => `[${timestamp}] ${level}: ${stack || message}`));
 const logger = winston_1.default.createLogger({
     level: "info",
     format: logFormat,
