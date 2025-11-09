@@ -167,7 +167,6 @@ io.on("connection", (socket) => {
 
       const updatedRoom = await prisma.room.findUnique({ where: { code } });
 
-      // Emit to the joining player first
       socket.emit("room_ready", {
         message: "Both players connected — game can start",
         room: updatedRoom,
@@ -175,7 +174,6 @@ io.on("connection", (socket) => {
 
       socket.join(code);
 
-      // Then emit to the rest of the room (the host)
       socket.to(code).emit("room_ready", {
         message: "Both players connected — game can start",
         room: updatedRoom,
