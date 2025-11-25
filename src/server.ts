@@ -14,44 +14,23 @@ dotenv.config();
 
 const { PORT, CORS_ORIGIN, SPORTS_API, JWT_SECRET } = process.env;
 
-const app = express();
-const server = http.createServer(app);
-
 if (!PORT || !CORS_ORIGIN || !SPORTS_API || !JWT_SECRET) {
   logger.error("Missing required environment variables");
   process.exit(1);
 }
 
-const allowedOrigins = [
-  "http://localhost:3000",
-  "https://hoop-frontend-git-main-himanshu-pragyans-projects.vercel.app",
-];
-
-app.use(
-  helmet({
-    crossOriginResourcePolicy: false,
-  })
-);
-
-app.use(
-  cors({
-    origin: allowedOrigins,
-    credentials: true,
-  })
-);
-
-app.options("*", cors());
-
-
+const app = express();
+const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: allowedOrigins,
+    origin: CORS_ORIGIN,
     methods: ["GET", "POST"],
     credentials: true,
   },
 });
 
-
+app.use(helmet());
+app.use(cors({ origin: CORS_ORIGIN }));
 app.use(express.json());
 
 interface Questions {
