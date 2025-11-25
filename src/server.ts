@@ -19,15 +19,29 @@ if (!PORT || !CORS_ORIGIN || !SPORTS_API || !JWT_SECRET) {
   process.exit(1);
 }
 
+const allowedOrigins = [
+  "http://localhost:3000",
+  "https://hoop-frontend-git-main-himanshu-pragyans-projects.vercel.app",
+];
+
 const app = express();
 const server = http.createServer(app);
+
+app.use(
+  cors({
+    origin: allowedOrigins,
+    credentials: true,
+  })
+);
+
 const io = new Server(server, {
   cors: {
-    origin: CORS_ORIGIN,
+    origin: allowedOrigins,
     methods: ["GET", "POST"],
     credentials: true,
   },
 });
+
 
 app.use(helmet());
 app.use(cors({ origin: CORS_ORIGIN }));
