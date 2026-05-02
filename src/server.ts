@@ -108,7 +108,7 @@ app.post("/signin", async (req, res) => {
         .status(200)
         .json({ message: "User signed in successfully", token });
     } else {
-      res.status(400).json({ message: "Incorrect Credentials" });
+      return res.status(400).json({ message: "Incorrect Credentials" });
     }
   } catch (e: any) {
     logger.error(e, "Error signing in");
