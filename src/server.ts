@@ -95,18 +95,25 @@ app.post("/signup", async (req, res) => {
 
 app.post("/signin", async (req, res) => {
   const { email, password } = req.body;
-  const existingUser = await prisma.user.findUnique({
-    where: { email },
-  });
-
-  if (!existingUser || existingUser.passwordHash !== password) {
-    return res.status(400).json({ message: "Incorrect Credentials" });
+  try {
+    const existingUser = await prisma.user.findUnique({
+      where: { email },
+    });
+    if (existingUser) {
+      if (existingUser.passwordHash !== password) {
+        return res.status(400).json({ message: "Incorrect Credentials" });
+      }
+      const token = createJWT(existingUser);
+      return res
+        .status(200)
+        .json({ message: "User signed in successfully", token });
+    } else {
+      res.status(400).json({ message: "Incorrect Credentials" });
+    }
+  } catch (e: any) {
+    logger.error(e, "Error signing in");
+    return res.status(500).json({ message: "Internal server error" });
   }
-
-  const token = createJWT(existingUser);
-  return res
-    .status(200)
-    .json({ message: "User signed in successfully", token });
 });
 
 function getCode(): number {
